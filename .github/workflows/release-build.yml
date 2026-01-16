@@ -1,0 +1,96 @@
+name: Build and Release Auto-Claude
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v2.7.2)'
+        required: true
+        default: 'v2.7.2'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js 24
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: 'npm'
+        
+    - name: Setup Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        npm install
+        npm run install:backend
+        npm run install:frontend
+        
+    - name: Build application
+      run: npm run build
+      
+    - name: Package Windows installer
+      run: npm run package:win
+      
+    - name: Upload installer artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: |
+          apps/frontend/dist/Auto-Claude-*.exe
+          apps/frontend/dist/Auto-Claude-*.zip
+          apps/frontend/dist/INSTALLATION_INSTRUCTIONS.txt
+          
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          apps/frontend/dist/Auto-Claude-*.exe
+          apps/frontend/dist/Auto-Claude-*.zip
+          apps/frontend/dist/INSTALLATION_INSTRUCTIONS.txt
+        body: |
+          ## 🚀 Auto-Claude Standalone Windows Release
+          
+          **Ready-to-use installers - No Node.js, Python, or command line required!**
+          
+          ### 📦 Downloads:
+          
+          - **Auto-Claude-*-win32-x64.exe** - Full Windows installer (recommended)
+            - Double-click to install like any Windows software
+            - Creates desktop shortcut and Start Menu entry
+            - Includes all dependencies and Python runtime
+          
+          - **Auto-Claude-*-win32-x64.zip** - Portable version
+            - Extract and run directly from any folder
+            - No installation required
+            
+          - **INSTALLATION_INSTRUCTIONS.txt** - Detailed setup guide
+          
+          ### ✅ What's Included:
+          - Complete Auto-Claude application
+          - Embedded Python 3.12.8 runtime
+          - All Python dependencies (Claude SDK, OpenAI, etc.)
+          - Electron desktop interface
+          - All backend services
+          
+          ### 🖥️ System Requirements:
+          - Windows 10/11 (64-bit)
+          - 500MB free disk space
+          - Internet connection for AI API calls
+          
+          **Just download, install, and start using - no technical setup needed!**
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
